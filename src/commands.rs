@@ -24,8 +24,14 @@ pub fn run_tag(tag: &Tag, matches: &ArgMatches) -> Result<()> {
         return Ok(());
     }
 
-    let mut path = if let Some(ref path) = tag.path {
-        path.as_str()
+    let cow;
+    let path = if let Some(ref path) = tag.path {
+        if path.starts_with('~') {
+            cow = shellexpand::tilde(path);
+            cow.as_ref()
+        } else {
+            path.as_ref()
+        }
     } else {
         return Err("tag has no path or url".into());
     };
@@ -40,12 +46,6 @@ pub fn run_tag(tag: &Tag, matches: &ArgMatches) -> Result<()> {
     if matches.contains_id("print") {
         println!("{}", path);
     } else if !silent_copy {
-        let cow;
-        if path.starts_with('~') {
-            cow = shellexpand::tilde(path);
-            path = cow.as_ref();
-        }
-
         if let Some(app) = matches.value_of("app").or(tag.app.as_deref()) {
             open::with(path, app)
         } else {
