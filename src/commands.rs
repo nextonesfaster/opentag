@@ -197,7 +197,7 @@ pub fn update(tags: &mut Tags) -> Result<()> {
         );
         if let Some(mut text) = Editor::new().edit(&msg)? {
             text = filter_text(text);
-            *field = (!text.is_empty()).then(|| text);
+            *field = (!text.is_empty()).then_some(text);
         }
 
         Ok(())
