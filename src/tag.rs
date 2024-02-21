@@ -103,10 +103,6 @@ pub fn command_from_tag(tag: &Tag) -> Command {
     let mut cmd = Command::new(tag.names.first().expect("expected at least one name"))
         .disable_help_subcommand(true);
 
-    if tag.path.is_none() && !tag.subtags.is_empty() {
-        cmd = cmd.subcommand_required(true);
-    }
-
     if let Some(ref long_about) = tag.about {
         cmd = cmd.about(long_about.lines().next());
         cmd = cmd.long_about(long_about.as_str());
