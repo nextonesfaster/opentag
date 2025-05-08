@@ -101,7 +101,9 @@ pub fn create_tags_file<P: AsRef<Path>>(path: P) -> Result<()> {
 /// Creates a `clap` subcommand for the given tag.
 pub fn command_from_tag(tag: &Tag) -> Command {
     let mut cmd = Command::new(tag.names.first().expect("expected at least one name"))
-        .disable_help_subcommand(true);
+        .disable_help_subcommand(true)
+        .subcommand_help_heading("Subtags")
+        .subcommand_value_name("SUBTAG");
 
     if let Some(long_about) = &tag.about {
         if let Some(about) = long_about.lines().next() {
