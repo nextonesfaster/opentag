@@ -16,14 +16,16 @@ in the help text.
 Project home page: https://github.com/nextonesfaster/opentag
 ";
 
-const HELP_TEMPLATE: &str = "{before-help}{bin} {version}
+const HELP_TEMPLATE: &str = color_print::cstr!(
+    r#"{before-help}<g><s>{bin}</></> {version}
 {author-with-newline}
 {about-with-newline}
 {usage-heading}
-  ot <--add|--remove|--update|--list>
-  ot [OPTIONS|--list] <TAG>
+  ot <<--add|--remove|--update|--list>>
+  ot [OPTIONS|--list] <<TAG>>
 
-{all-args}{after-help}";
+{all-args}{after-help}"#
+);
 
 pub fn create_tags_app(tags: &Tags) -> Command {
     clap::command!()
