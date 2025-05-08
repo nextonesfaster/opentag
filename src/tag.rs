@@ -103,13 +103,15 @@ pub fn command_from_tag(tag: &Tag) -> Command {
     let mut cmd = Command::new(tag.names.first().expect("expected at least one name"))
         .disable_help_subcommand(true);
 
-    if let Some(ref long_about) = tag.about {
-        cmd = cmd.about(long_about.lines().next());
-        cmd = cmd.long_about(long_about.as_str());
+    if let Some(long_about) = &tag.about {
+        if let Some(about) = long_about.lines().next() {
+            cmd = cmd.about(about.to_string());
+        }
+        cmd = cmd.long_about(long_about);
     }
 
     for alias in tag.names.iter().skip(1) {
-        cmd = cmd.visible_alias(alias.as_str());
+        cmd = cmd.visible_alias(alias);
     }
 
     cmd.subcommands(tag.subtags.iter().map(command_from_tag))

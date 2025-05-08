@@ -3,7 +3,7 @@ mod commands;
 mod error;
 mod tag;
 
-use error::{exit, Result};
+use error::{Result, exit};
 use tag::Tag;
 
 fn run_app() -> Result<()> {
@@ -12,13 +12,12 @@ fn run_app() -> Result<()> {
         tag::create_tags_file(&path)?;
     }
     let mut tags = tag::get_tags(&path)?;
-    let tags_clone = tags.clone();
 
-    let mut app = app::create_tags_app(&tags_clone);
+    let mut app = app::create_tags_app(&tags);
     let matches = app.get_matches_mut();
 
     if let Some((name, sub_matches)) = matches.subcommand() {
-        if matches.contains_id("cmd-conflict") && !matches.contains_id("list") {
+        if matches.contains_id("cmd-conflict") && !matches.get_flag("list") {
             return Err("this argument cannot be used with a tag".into());
         }
 
@@ -27,7 +26,7 @@ fn run_app() -> Result<()> {
         } else {
             return Err("no tag found".into());
         }
-    } else if matches.contains_id("list") {
+    } else if matches.get_flag("list") {
         if app.has_subcommands() {
             app = app.help_template("TAGS\n{subcommands}");
             for subcmd in app.get_subcommands_mut() {
@@ -39,13 +38,13 @@ fn run_app() -> Result<()> {
             println!("No tags!");
         }
     } else {
-        let action = if matches.contains_id("add") {
+        let action = if matches.get_flag("add") {
             commands::add(&mut tags)?;
             "Added"
-        } else if matches.contains_id("remove") {
+        } else if matches.get_flag("remove") {
             commands::remove(&mut tags)?;
             "Removed"
-        } else if matches.contains_id("update") {
+        } else if matches.get_flag("update") {
             commands::update(&mut tags)?;
             "Updated"
         } else {

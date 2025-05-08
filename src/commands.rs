@@ -4,13 +4,13 @@ use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Editor, FuzzySelect, Input};
 use itertools::Itertools;
 
-use crate::error::Result;
-use crate::tag::{command_from_tag, Tags};
 use crate::Tag;
+use crate::error::Result;
+use crate::tag::{Tags, command_from_tag};
 
 /// Runs the command for the given tag.
 pub fn run_tag(tag: &Tag, matches: &ArgMatches) -> Result<()> {
-    if matches.contains_id("list") {
+    if matches.get_flag("list") {
         // TODO: This is a terrible hack. Write own implementation.
         if !tag.subtags.is_empty() {
             let mut app = Command::new("list-subcommands")
@@ -36,17 +36,17 @@ pub fn run_tag(tag: &Tag, matches: &ArgMatches) -> Result<()> {
         return Err("tag has no path or url".into());
     };
 
-    let silent_copy = matches.contains_id("silent-copy");
+    let silent_copy = matches.get_flag("silent-copy");
 
-    if matches.contains_id("copy") || silent_copy {
+    if matches.get_flag("copy") || silent_copy {
         let mut clipboard = Clipboard::new()?;
         clipboard.set_text(path.to_string())?;
     }
 
-    if matches.contains_id("print") {
+    if matches.get_flag("print") {
         println!("{}", path);
     } else if !silent_copy {
-        if let Some(app) = matches.value_of("app").or(tag.app.as_deref()) {
+        if let Some(app) = matches.get_one::<String>("app").or(tag.app.as_ref()) {
             open::with(path, app)
         } else {
             open::that(path)
