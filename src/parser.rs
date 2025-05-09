@@ -6,9 +6,9 @@ pub(crate) enum TagAttribute {
     App(String),
 }
 
-pub(crate) fn update_tag_parser(s: &str) -> Result<TagAttribute, String> {
+pub(crate) fn tag_attribute_parser(s: &str) -> Result<TagAttribute, &'static str> {
     let Some((attrib, val)) = s.split_once('=') else {
-        return Err("expected valid tag attribute and value".to_string());
+        return Err("expected valid tag attribute and value");
     };
 
     Ok(match attrib {
@@ -16,6 +16,6 @@ pub(crate) fn update_tag_parser(s: &str) -> Result<TagAttribute, String> {
         "path" | "P" => TagAttribute::Path(val.to_string()),
         "about" => TagAttribute::About(val.to_string()),
         "default-app" | "D" => TagAttribute::App(val.to_string()),
-        _ => return Err("invalid tag attribute".to_string()),
+        _ => return Err("invalid tag attribute"),
     })
 }

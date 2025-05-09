@@ -110,7 +110,7 @@ pub fn command_from_tag(tag: &Tag) -> Command {
             Arg::new("tag-update")
                 .short('U')
                 .long("update")
-                .value_parser(parser::update_tag_parser)
+                .value_parser(parser::tag_attribute_parser)
                 .action(ArgAction::Append)
                 .help("Edit the specified attribute for the tag."),
         );
