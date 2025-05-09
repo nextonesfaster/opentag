@@ -1,11 +1,13 @@
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use clap::{ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Command};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::error::Result;
+use crate::parser;
 
 /// Represents a tag.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -103,7 +105,15 @@ pub fn command_from_tag(tag: &Tag) -> Command {
     let mut cmd = Command::new(tag.names.first().expect("expected at least one name"))
         .disable_help_subcommand(true)
         .subcommand_help_heading("Subtags")
-        .subcommand_value_name("SUBTAG");
+        .subcommand_value_name("SUBTAG")
+        .arg(
+            Arg::new("tag-update")
+                .short('U')
+                .long("update")
+                .value_parser(parser::update_tag_parser)
+                .action(ArgAction::Append)
+                .help("Edit the specified attribute for the tag."),
+        );
 
     if let Some(long_about) = &tag.about {
         if let Some(about) = long_about.lines().next() {
@@ -120,13 +130,17 @@ pub fn command_from_tag(tag: &Tag) -> Command {
 }
 
 /// Find the tag matching the command invocation.
-pub fn find_tag<'a>(tags: &'a Tags, cmd: &str, matches: &ArgMatches) -> Option<&'a Tag> {
+pub fn find_tag_and_sub_match<'a, 'b>(
+    tags: &'a mut Tags,
+    cmd: &str,
+    matches: &'b ArgMatches,
+) -> Option<(&'a mut Tag, &'b ArgMatches)> {
     for tag in tags {
         if tag.names.contains(&cmd.to_string()) {
             if let Some((subcmd, sub_matches)) = matches.subcommand() {
-                return find_tag(&tag.subtags, subcmd, sub_matches);
+                return find_tag_and_sub_match(&mut tag.subtags, subcmd, sub_matches);
             } else {
-                return Some(tag);
+                return Some((tag, matches));
             }
         }
     }
@@ -176,4 +190,38 @@ where
         }
     }
     seq.end()
+}
+
+/// Checks if any two tags have a common name at the same level of tag hierarchy.
+pub fn validate_tags(tags: &Tags) -> Option<&str> {
+    fn recurse(tags: &Tags) -> Option<&str> {
+        let mut seen = HashSet::new();
+        for tag in tags {
+            for name in &tag.names {
+                if !seen.insert(name.as_str()) {
+                    return Some(name);
+                }
+            }
+        }
+
+        for tag in tags {
+            if let Some(dupe) = recurse(&tag.subtags) {
+                return Some(dupe);
+            }
+        }
+
+        None
+    }
+
+    recurse(tags)
+}
+
+/// Writes the tags at the given path if they are valid.
+///
+/// Creates the file at path if it does not exist.
+pub fn validate_and_write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
+    if let Some(common) = validate_tags(&tags) {
+        return Err(format!("a tag with name `{common}` already exists").into());
+    }
+    write_tags(tags, path)
 }

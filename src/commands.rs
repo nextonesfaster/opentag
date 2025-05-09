@@ -6,10 +6,13 @@ use itertools::Itertools;
 
 use crate::Tag;
 use crate::error::Result;
+use crate::parser::TagAttribute;
 use crate::tag::{Tags, command_from_tag};
 
 /// Runs the command for the given tag.
-pub fn run_tag(tag: &Tag, matches: &ArgMatches) -> Result<()> {
+///
+/// Returns `true` if the tag is updated.
+pub fn run_tag(tag: &mut Tag, matches: &ArgMatches) -> Result<bool> {
     if matches.get_flag("list") {
         // TODO: This is a terrible hack. Write own implementation.
         if !tag.subtags.is_empty() {
@@ -21,7 +24,13 @@ pub fn run_tag(tag: &Tag, matches: &ArgMatches) -> Result<()> {
         } else {
             println!("No tags!");
         }
-        return Ok(());
+        return Ok(false);
+    } else if let Some(v) = matches
+        .get_many::<TagAttribute>("tag-update")
+        .map(|v| v.cloned().collect::<Vec<_>>())
+    {
+        update_tag_inline(tag, v)?;
+        return Ok(true);
     }
 
     let cow;
@@ -54,7 +63,7 @@ pub fn run_tag(tag: &Tag, matches: &ArgMatches) -> Result<()> {
         .map_err(|e| format!("unable to open `{}`: {}", path, e))?;
     }
 
-    Ok(())
+    Ok(false)
 }
 
 /// Prompts user to recursively select a tag.
@@ -206,4 +215,17 @@ pub fn update(tags: &mut Tags) -> Result<()> {
     update_field(&mut tag.path, "Please edit/enter the path/url above.")?;
     update_field(&mut tag.about, "Please edit/enter the description above.")?;
     update_field(&mut tag.app, "Please edit/enter the default app above.")
+}
+
+fn update_tag_inline(tag: &mut Tag, updates: Vec<TagAttribute>) -> Result<()> {
+    for update in updates {
+        match update {
+            TagAttribute::Names(s) => tag.names = s,
+            TagAttribute::Path(s) => tag.path = Some(s),
+            TagAttribute::About(s) => tag.about = Some(s),
+            TagAttribute::App(s) => tag.app = Some(s),
+        }
+    }
+
+    Ok(())
 }

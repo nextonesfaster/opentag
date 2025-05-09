@@ -1,6 +1,7 @@
 mod app;
 mod commands;
 mod error;
+mod parser;
 mod tag;
 
 use error::{Result, exit};
@@ -21,8 +22,13 @@ fn run_app() -> Result<()> {
             return Err("this argument cannot be used with a tag".into());
         }
 
-        if let Some(tag) = tag::find_tag(&tags, name, sub_matches) {
-            commands::run_tag(tag, &matches)?;
+        if let Some((tag, sub_matches)) = tag::find_tag_and_sub_match(&mut tags, name, sub_matches)
+        {
+            let updated = commands::run_tag(tag, sub_matches)?;
+            if updated {
+                tag::validate_and_write_tags(tags, &path)?;
+                println!("Updated tag.")
+            }
         } else {
             return Err("no tag found".into());
         }
@@ -51,7 +57,7 @@ fn run_app() -> Result<()> {
             return Err("invalid invocation".into());
         };
 
-        tag::write_tags(tags, &path)?;
+        tag::validate_and_write_tags(tags, &path)?;
         println!("\n{} tag.", action);
     }
 
