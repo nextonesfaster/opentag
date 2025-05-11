@@ -21,9 +21,7 @@ const HELP_TEMPLATE: &str = color_print::cstr!(
     r#"{before-help}<g><s>{bin}</></> {version}
 {author-with-newline}
 {about-with-newline}
-{usage-heading}
-  ot <<--add|--remove|--update|--list>>
-  ot [OPTIONS|--list] <<TAG>>
+{usage-heading} {usage}
 
 {all-args}{after-help}"#
 );
@@ -37,7 +35,6 @@ pub(crate) fn create_tags_app(tags: &Tags) -> Command {
         .long_about(ABOUT)
         .help_template(HELP_TEMPLATE)
         .hide_possible_values(true)
-        .subcommand_help_heading("Tags")
         .styles(
             Styles::styled()
                 .header(AnsiColor::Yellow.on_default().bold().underline())
