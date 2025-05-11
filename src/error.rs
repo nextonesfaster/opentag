@@ -4,13 +4,13 @@ use std::io::Write;
 use termcolor::{BufferWriter, Color, ColorChoice, ColorSpec, WriteColor};
 
 /// Result type used throughout the crate.
-pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+pub(crate) type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 /// Prints the error on the `stderr` and exits with the provided exit code.
 ///
 /// "error: " is displayed before the error message. The "error" is displayed in
 /// red and bold if possible.
-pub fn exit<T: Display>(err: T, code: i32) -> ! {
+pub(crate) fn exit<T: Display>(err: T, code: i32) -> ! {
     print_error(&err).unwrap_or_else(|_| eprintln!("error: {}", err));
     std::process::exit(code);
 }

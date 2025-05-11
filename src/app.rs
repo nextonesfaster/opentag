@@ -28,7 +28,7 @@ const HELP_TEMPLATE: &str = color_print::cstr!(
 {all-args}{after-help}"#
 );
 
-pub fn create_tags_app(tags: &Tags) -> Command {
+pub(crate) fn create_tags_app(tags: &Tags) -> Command {
     clap::command!()
         .arg_required_else_help(true)
         .subcommand_negates_reqs(true)

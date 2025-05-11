@@ -12,38 +12,38 @@ use crate::error::Result;
 
 /// Represents a tag.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
-pub struct Tag {
+pub(crate) struct Tag {
     /// The names of the tag.
     #[serde(
         alias = "name",
         deserialize_with = "deserialize_one_or_more",
         skip_serializing_if = "Vec::is_empty"
     )]
-    pub names: Vec<String>,
+    pub(crate) names: Vec<String>,
     /// The path to open, if any.
     #[serde(alias = "url", alias = "link", skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
+    pub(crate) path: Option<String>,
     /// Short info about the tag.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub about: Option<String>,
+    pub(crate) about: Option<String>,
     /// Default application to open the tag with.
     #[serde(
         alias = "default_app",
         alias = "default_application",
         skip_serializing_if = "Option::is_none"
     )]
-    pub app: Option<String>,
+    pub(crate) app: Option<String>,
     /// Subtags associated with the tag.
     #[serde(
         default,
         skip_serializing_if = "Vec::is_empty",
         serialize_with = "skip_no_names"
     )]
-    pub subtags: Vec<Tag>,
+    pub(crate) subtags: Vec<Tag>,
 }
 
 /// A collection of tags.
-pub type Tags = Vec<Tag>;
+pub(crate) type Tags = Vec<Tag>;
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 #[serde(transparent)]
@@ -53,7 +53,7 @@ struct TagsSerde(#[serde(serialize_with = "skip_no_names")] Tags);
 ///
 /// Errors if unable to retrieve the home directory path (and
 /// `$OPENTAG_DATA` is not set).
-pub fn get_tags_path() -> Result<PathBuf> {
+pub(crate) fn get_tags_path() -> Result<PathBuf> {
     env::var("OPENTAG_DATA").map_or_else(
         |_| {
             dirs_next::data_dir()
@@ -65,7 +65,7 @@ pub fn get_tags_path() -> Result<PathBuf> {
 }
 
 /// Returns the serialized tags present at the given path.
-pub fn get_tags<P: AsRef<Path>>(path: P) -> Result<Tags> {
+pub(crate) fn get_tags<P: AsRef<Path>>(path: P) -> Result<Tags> {
     let path = path.as_ref();
     let contents = fs::read_to_string(path)
         .map_err(|e| format!("tags file error at path `{}`: {}", path.display(), e))?;
@@ -76,7 +76,7 @@ pub fn get_tags<P: AsRef<Path>>(path: P) -> Result<Tags> {
 }
 
 /// Writes the tags at the given path, creating the file if it does not exist.
-pub fn write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
+pub(crate) fn write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
     Ok(fs::write(
         path,
         serde_json::to_string_pretty(&TagsSerde(tags))?,
@@ -87,7 +87,7 @@ pub fn write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
 /// if they are missing.
 ///
 /// `path` must be the path to the tags FILE.
-pub fn create_tags_file<P: AsRef<Path>>(path: P) -> Result<()> {
+pub(crate) fn create_tags_file<P: AsRef<Path>>(path: P) -> Result<()> {
     let path = path.as_ref();
 
     if let Some(parent) = path.parent() {
@@ -102,7 +102,7 @@ pub fn create_tags_file<P: AsRef<Path>>(path: P) -> Result<()> {
 }
 
 /// Creates a `clap` subcommand for the given tag.
-pub fn command_from_tag(tag: &Tag) -> Command {
+pub(crate) fn command_from_tag(tag: &Tag) -> Command {
     let mut cmd = Command::new(tag.names.first().expect("expected at least one name"))
         .disable_help_subcommand(true)
         .hide(true);
@@ -130,7 +130,7 @@ pub fn command_from_tag(tag: &Tag) -> Command {
 /// If a default subcommand is encountered, recursion stops. In that case, the
 /// returned [`ArgMatches`] corresponds to the default subcommand, not the tag itself,
 /// and the third value contains the name of the default subcommand.
-pub fn find_matching_tag<'a>(
+pub(crate) fn find_matching_tag<'a>(
     tags: &'a mut Tags,
     cmd: &str,
     mut matches: ArgMatches,
@@ -196,7 +196,7 @@ where
 }
 
 /// Checks if any two tags have a common name at the same level of tag hierarchy.
-pub fn validate_tags(tags: &Tags) -> Option<&str> {
+pub(crate) fn validate_tags(tags: &Tags) -> Option<&str> {
     fn recurse(tags: &Tags) -> Option<&str> {
         let mut seen = HashSet::new();
         for tag in tags {
@@ -222,7 +222,7 @@ pub fn validate_tags(tags: &Tags) -> Option<&str> {
 /// Writes the tags at the given path if they are valid.
 ///
 /// Creates the file at path if it does not exist.
-pub fn validate_and_write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
+pub(crate) fn validate_and_write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
     if let Some(common) = validate_tags(&tags) {
         return Err(format!("a tag with name `{common}` already exists").into());
     }

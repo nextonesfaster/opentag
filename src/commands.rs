@@ -10,7 +10,7 @@ use crate::Tag;
 use crate::error::Result;
 use crate::tag::{self, Tags};
 
-pub const DEFAULT_SUBCOMMAND_NAMES: [&str; 3] = ["add", "remove", "update"];
+pub(crate) const DEFAULT_SUBCOMMAND_NAMES: [&str; 3] = ["add", "remove", "update"];
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MatchFlags {
@@ -42,7 +42,7 @@ impl MatchFlags {
 /// Runs the command for the given tag.
 ///
 /// Returns `true` if the tag is updated.
-pub fn run_tag(tag: &mut Tag, flags: MatchFlags) -> Result<()> {
+pub(crate) fn run_tag(tag: &mut Tag, flags: MatchFlags) -> Result<()> {
     if flags.list {
         // TODO: This is a terrible hack. Write own implementation.
         if !tag.subtags.is_empty() {
@@ -118,7 +118,7 @@ fn select_tag<'a>(
 }
 
 /// Runs the add command.
-pub fn add(tags: &mut Tags) -> Result<()> {
+pub(crate) fn interactive_add(tags: &mut Tags) -> Result<()> {
     let names: Vec<_> = Input::<String>::new()
         .with_prompt("Enter tag name and aliases (comma-separated; at least one)")
         .interact_text()?
@@ -166,7 +166,7 @@ pub fn add(tags: &mut Tags) -> Result<()> {
 }
 
 /// Runs the remove command.
-pub fn remove(tags: &mut Tags, prompt: bool) -> Result<bool> {
+pub(crate) fn interactive_remove(tags: &mut Tags, prompt: bool) -> Result<bool> {
     let Some(tag) = select_tag(
         tags,
         "Select the parent tag (press `esc` to quit)",
@@ -189,7 +189,7 @@ pub fn remove(tags: &mut Tags, prompt: bool) -> Result<bool> {
 }
 
 /// Runs the update command.
-pub fn update(tags: &mut Tags) -> Result<bool> {
+pub(crate) fn interactive_update(tags: &mut Tags) -> Result<bool> {
     let Some(tag) = select_tag(
         tags,
         "Select the parent tag (press `esc` to quit)",
@@ -256,16 +256,16 @@ pub(crate) fn run_global_default_command(
             add_tag_inline(tag, &mut tags)?;
             tag::write_tags(tags, path)?;
         } else {
-            add(&mut tags)?;
+            interactive_add(&mut tags)?;
             tag::validate_and_write_tags(tags, path)?;
         }
         println!("\nAdded tag.");
     } else if name == "remove" {
-        if remove(&mut tags, !matches.get_flag("no-prompt"))? {
+        if interactive_remove(&mut tags, !matches.get_flag("no-prompt"))? {
             tag::write_tags(tags, path)?;
             println!("\nRemoved tag.");
         }
-    } else if name == "update" && update(&mut tags)? {
+    } else if name == "update" && interactive_update(&mut tags)? {
         tag::validate_and_write_tags(tags, path)?;
         println!("\nUpdated tag.");
     }
