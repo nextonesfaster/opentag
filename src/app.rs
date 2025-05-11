@@ -59,30 +59,30 @@ pub(crate) fn get_global_args() -> [Arg; 5] {
             .short('p')
             .long("print")
             .action(ArgAction::SetTrue)
-            .help("Prints the path or the URL instead of opening it."),
+            .help("Print the path or the URL instead of opening it"),
         Arg::new("app")
             .short('A')
             .long("app")
             .num_args(1)
             .value_name("APP-NAME")
             .conflicts_with_all(["print", "silent-copy"])
-            .help("Specifies the app to open the path or the URL with."),
+            .help("Specify the app to open the path or the URL with"),
         Arg::new("copy")
             .short('c')
             .long("copy")
             .action(ArgAction::SetTrue)
-            .help("Copies the path or the URL to the system's clipboard."),
+            .help("Copy the path or the URL to the system's clipboard"),
         Arg::new("silent-copy")
             .short('C')
             .long("silent-copy")
             .action(ArgAction::SetTrue)
-            .help("Copies the path or the URL to the system's clipboard without opening the path."),
+            .help("Copy the path or the URL to the system's clipboard without opening the path"),
         Arg::new("list")
             .short('l')
             .long("list")
             .conflicts_with_all(["copy", "print", "app", "silent-copy"])
             .action(ArgAction::SetTrue)
-            .help("Lists all global tags or subtags of specified tag."),
+            .help("List all global tags or subtags of specified tag"),
     ]
 }
 
@@ -95,7 +95,7 @@ pub(crate) fn get_default_subcommands() -> [Command; 3] {
             .long("path")
             .num_args(0..=1)
             .value_name("PATH")
-            .help("Sets the path/URL of the tag"),
+            .help("Set the path/URL of the tag"),
         Arg::new("alias")
             .short('A')
             .long("alias")
@@ -103,17 +103,18 @@ pub(crate) fn get_default_subcommands() -> [Command; 3] {
             .value_name("ALIAS(ES)")
             .value_parser(tag_aliases_parser)
             .num_args(0..=1)
-            .help("Sets alias(es) for the tag. Multiple aliases must be comma-separated."),
+            .help("Set alias(es) for the tag")
+            .long_help("Set alias(es) for the tag. Multiple aliases must be comma-separated."),
         Arg::new("about")
             .long("about")
             .num_args(0..=1)
             .value_name("TEXT")
-            .help("Sets the about text for the tag"),
+            .help("Set the about text for the tag"),
         Arg::new("app")
             .long("app")
             .num_args(0..=1)
             .value_name("APP-NAME")
-            .help("Specifies the app to open the path or the URL with"),
+            .help("Specify the app to open the path or the URL with"),
     ];
 
     [
@@ -123,22 +124,22 @@ pub(crate) fn get_default_subcommands() -> [Command; 3] {
                 Arg::new("name")
                     .value_parser(tag_name_parser)
                     .value_name("TAG-NAME")
-                    .help("Sets the name of the tag"),
+                    .help("Set the name of the tag"),
             )
             .args(common_args.clone())
-            .about("Adds a new tag")
-            .long_about("Adds a new tag. If no name is provided, the command enters interactive mode."),
+            .about("Add a new tag")
+            .long_about("Add a new tag. If no name is provided, the command enters interactive mode."),
         Command::new("remove")
             .visible_short_flag_alias('r')
-            .about("Removes an existing tag")
             .arg(
                 Arg::new("no-prompt")
                     .short('N')
                     .long("no-prompt")
                     .action(ArgAction::SetTrue)
-                    .help("Disables the confirmation prompt when removing a tag"),
+                    .help("Disable the confirmation prompt when removing a tag"),
             )
-            .long_about("Removes an existing tag. If no tag is specified, the command enters interactive mode."),
+            .about("Remove an existing tag")
+            .long_about("Remove an existing tag. If no tag is specified, the command enters interactive mode."),
         Command::new("update")
             .visible_short_flag_alias('u')
             .arg(
@@ -147,10 +148,10 @@ pub(crate) fn get_default_subcommands() -> [Command; 3] {
                     .long("name")
                     .value_name("TAG-NAME")
                     .value_parser(tag_name_parser)
-                    .help("Sets the name of the tag"),
+                    .help("Set the name of the tag"),
             )
             .args(common_args)
-            .about("Updates an existing tag")
-            .long_about("Updates an existing tag. If no tag is specified, the command enters interactive mode."),
+            .about("Update an existing tag")
+            .long_about("Update an existing tag. If no tag is specified, the command enters interactive mode."),
     ]
 }

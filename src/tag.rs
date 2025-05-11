@@ -207,7 +207,7 @@ pub(crate) fn command_from_tag(tag: &Tag) -> Command {
                 .long("info")
                 .action(clap::ArgAction::SetTrue)
                 .conflicts_with_all(["print", "silent-copy", "list"])
-                .help("Shows information about the tag"),
+                .help("Show information about the tag"),
         )
         .subcommands(get_default_subcommands())
         .subcommands(tag.subtags.iter().map(command_from_tag))
