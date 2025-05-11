@@ -5,7 +5,7 @@ mod parser;
 mod tag;
 
 use commands::MatchFlags;
-use error::{Result, exit};
+use error::{Error, Result, exit};
 use tag::Tag;
 
 fn run_app() -> Result<()> {
@@ -33,7 +33,7 @@ fn run_app() -> Result<()> {
                 commands::run_tag(tag, MatchFlags::from_matches([matches, ssm]))?;
             }
         } else {
-            return Err("no tag found".into());
+            return Err(Error::NoTagFound.into());
         }
     } else if matches.get_flag("list") {
         if app.has_subcommands() {

@@ -7,8 +7,8 @@ use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::app::{get_args, get_default_subcommands};
-use crate::commands;
 use crate::error::Result;
+use crate::{Error, commands};
 
 /// Represents a tag.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -153,17 +153,15 @@ fn validate_tags(tags: &Tags) -> Result<()> {
 
         for tag in tags {
             for name in &tag.names {
-                let name_str = name.as_str();
-
-                if seen.contains(name_str) {
-                    return Err(format!("a tag with name `{}` already exists", name_str).into());
+                if seen.contains(name) {
+                    return Err(Error::NameInUse(name.to_string()).into());
                 }
 
-                if commands::DEFAULT_SUBCOMMAND_NAMES.contains(&name_str) {
-                    return Err(format!("`{}` cannot be used as a tag name", name_str).into());
+                if commands::DEFAULT_SUBCOMMAND_NAMES.contains(&name.as_str()) {
+                    return Err(Error::ReservedName(name.to_string()).into());
                 }
 
-                seen.insert(name_str);
+                seen.insert(name);
             }
         }
 

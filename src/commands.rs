@@ -7,7 +7,7 @@ use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Editor, FuzzySelect, Input};
 
 use crate::Tag;
-use crate::error::Result;
+use crate::error::{Error, Result};
 use crate::tag::{self, Tags};
 
 pub(crate) const DEFAULT_SUBCOMMAND_NAMES: [&str; 3] = ["add", "remove", "update"];
@@ -64,7 +64,7 @@ pub(crate) fn run_tag(tag: &mut Tag, flags: MatchFlags) -> Result<()> {
             path.as_ref()
         }
     } else {
-        return Err("tag has no path or url".into());
+        return Err(Error::TagWithNoPath.into());
     };
 
     if flags.copy || flags.silent_copy {
@@ -150,13 +150,13 @@ pub(crate) fn run_nested_default_command(
             update_tag_inline(tag, matches)?;
             Ok("Updated")
         },
-        _ => Err(format!("unexpected command: {command}").into()),
+        _ => Err(Error::UnexpectedCommand(command.to_string()).into()),
     }
 }
 
 pub fn add_tag_inline(tag: Tag, tags: &mut Tags) -> Result<()> {
     if let Some(name) = check_if_names_are_used(&tag.names, tags) {
-        return Err(format!("a tag with name `{}` already exists", name).into());
+        return Err(Error::NameInUse(name.clone()).into());
     }
 
     tags.push(tag);
@@ -261,7 +261,7 @@ fn interactive_add(tags: &mut Tags) -> Result<()> {
     };
 
     if let Some(name) = check_if_names_are_used(&names, subtags) {
-        return Err(format!("a tag with name `{}` already exists", name).into());
+        return Err(Error::NameInUse(name.clone()).into());
     }
 
     let get_optional = |prompt| -> Result<Option<String>> {
@@ -344,7 +344,7 @@ fn interactive_update(tags: &mut Tags) -> Result<bool> {
             .map(|s| s.trim().to_string())
             .collect::<Vec<_>>();
         if names.is_empty() {
-            return Err("there must be at least one name".into());
+            return Err(Error::MissingName.into());
         }
         tag.names = names;
     }
