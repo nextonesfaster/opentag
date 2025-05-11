@@ -145,25 +145,33 @@ pub(crate) fn create_tags_file<P: AsRef<Path>>(path: P) -> Result<()> {
     Ok(())
 }
 
-/// Checks if any two tags have a common name at the same level of tag hierarchy.
-pub(crate) fn validate_tags(tags: &Tags) -> Option<&str> {
-    fn recurse(tags: &Tags) -> Option<&str> {
+/// Checks that no two tags at the same level share a common name,
+/// and that no tag name conflicts with reserved default command names.
+fn validate_tags(tags: &Tags) -> Result<()> {
+    fn recurse(tags: &Tags) -> Result<()> {
         let mut seen = HashSet::new();
+
         for tag in tags {
             for name in &tag.names {
-                if !seen.insert(name.as_str()) {
-                    return Some(name);
+                let name_str = name.as_str();
+
+                if seen.contains(name_str) {
+                    return Err(format!("a tag with name `{}` already exists", name_str).into());
                 }
+
+                if commands::DEFAULT_SUBCOMMAND_NAMES.contains(&name_str) {
+                    return Err(format!("`{}` cannot be used as a tag name", name_str).into());
+                }
+
+                seen.insert(name_str);
             }
         }
 
         for tag in tags {
-            if let Some(dupe) = recurse(&tag.subtags) {
-                return Some(dupe);
-            }
+            recurse(&tag.subtags)?;
         }
 
-        None
+        Ok(())
     }
 
     recurse(tags)
@@ -173,9 +181,7 @@ pub(crate) fn validate_tags(tags: &Tags) -> Option<&str> {
 ///
 /// Creates the file at path if it does not exist.
 pub(crate) fn validate_and_write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
-    if let Some(common) = validate_tags(&tags) {
-        return Err(format!("a tag with name `{common}` already exists").into());
-    }
+    validate_tags(&tags)?;
     write_tags(tags, path)
 }
 
