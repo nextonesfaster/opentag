@@ -37,7 +37,7 @@ fn run_app() -> Result<()> {
         }
     } else if matches.get_flag("list") {
         if app.has_subcommands() {
-            commands::list_tags(app)?;
+            commands::list_tags_from_app(app, "TAGS")?;
         } else {
             println!("No tags!");
         }

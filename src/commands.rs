@@ -1,4 +1,5 @@
 use std::collections::HashSet;
+use std::fmt::Write;
 use std::path::PathBuf;
 
 use arboard::Clipboard;
@@ -14,11 +15,12 @@ pub(crate) const DEFAULT_SUBCOMMAND_NAMES: [&str; 3] = ["add", "remove", "update
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct MatchOptions {
-    pub(crate) print: bool,
-    pub(crate) copy: bool,
-    pub(crate) list: bool,
-    pub(crate) silent_copy: bool,
-    pub(crate) app: Option<String>,
+    print: bool,
+    copy: bool,
+    list: bool,
+    silent_copy: bool,
+    app: Option<String>,
+    info: bool,
 }
 
 impl MatchOptions {
@@ -33,6 +35,11 @@ impl MatchOptions {
             if flags.app.is_none() {
                 flags.app = matches.remove_one::<String>("app");
             }
+            flags.info |= matches
+                .try_remove_one::<bool>("info")
+                .ok()
+                .flatten()
+                .unwrap_or_default();
         }
 
         flags
@@ -46,10 +53,8 @@ pub(crate) fn run_tag(tag: &mut Tag, options: MatchOptions) -> Result<()> {
     if options.list {
         // TODO: This is a terrible hack. Write own implementation.
         if !tag.subtags.is_empty() {
-            let app = Command::new("list-subcommands")
-                .subcommands(tag.subtags.iter().map(tag::command_from_tag));
-            list_tags(app)?;
-        } else {
+            _list_tags(tag, "TAGS")?;
+        } else if !options.info {
             println!("No tags!");
         }
         return Ok(());
@@ -67,6 +72,8 @@ pub(crate) fn run_tag(tag: &mut Tag, options: MatchOptions) -> Result<()> {
         return Err(Error::TagWithNoPath.into());
     };
 
+    let silent = options.silent_copy || options.info;
+
     if options.copy || options.silent_copy {
         let mut clipboard = Clipboard::new()?;
         clipboard.set_text(path.to_string())?;
@@ -74,13 +81,15 @@ pub(crate) fn run_tag(tag: &mut Tag, options: MatchOptions) -> Result<()> {
 
     if options.print {
         println!("{}", path);
-    } else if !options.silent_copy {
+    } else if !silent {
         if let Some(app) = options.app.as_ref().or(tag.app.as_ref()) {
             open::with(path, app)
         } else {
             open::that(path)
         }
         .map_err(|e| format!("unable to open `{}`: {}", path, e))?;
+    } else if options.info {
+        print_tag_info(tag)?;
     }
 
     Ok(())
@@ -114,9 +123,16 @@ pub(crate) fn run_global_default_command(
     Ok(())
 }
 
-pub(crate) fn list_tags(mut app: Command) -> Result<()> {
+fn _list_tags(tag: &Tag, label: &str) -> Result<()> {
+    let app =
+        Command::new("list-subcommands").subcommands(tag.subtags.iter().map(tag::command_from_tag));
+    list_tags_from_app(app, label)?;
+    Ok(())
+}
+
+pub(crate) fn list_tags_from_app(mut app: Command, label: &str) -> Result<()> {
     app = app
-        .help_template("TAGS\n{subcommands}")
+        .help_template(format!("{label}\n{{subcommands}}"))
         .disable_help_subcommand(true);
     for subcmd in app.get_subcommands_mut() {
         *subcmd = subcmd
@@ -404,4 +420,38 @@ fn check_if_names_are_used<'a>(names: &'a [String], subtags: &[Tag]) -> Option<&
         used.extend(&tag.names);
     }
     names.iter().find(|&name| used.contains(name))
+}
+
+/// Prints the tag info.
+///
+/// Does not print its subtags.
+fn print_tag_info(tag: &Tag) -> Result<()> {
+    let mut info_str = String::new();
+
+    color_print::cwrite!(info_str, "<g><s>{}</></>", tag.names[0])?;
+
+    if tag.names.len() > 1 {
+        color_print::cwriteln!(info_str, " [aliases: {}]", tag.names[1..].join(", "))?;
+    } else {
+        writeln!(info_str)?;
+    }
+
+    if let Some(about) = &tag.about {
+        writeln!(info_str, "\n{about}")?;
+    }
+
+    if let Some(app) = &tag.app {
+        color_print::cwriteln!(info_str, "\n<y><u>App:</></> {app}")?;
+    }
+
+    println!("{info_str}");
+
+    let subtags_label = color_print::cstr!("<y><u>Subtags:</></>");
+    if tag.subtags.is_empty() {
+        println!("{subtags_label} none");
+    } else {
+        _list_tags(tag, subtags_label)?;
+    }
+
+    Ok(())
 }

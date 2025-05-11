@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use clap::{ArgMatches, Command};
+use clap::{Arg, ArgMatches, Command};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
@@ -201,6 +201,14 @@ pub(crate) fn command_from_tag(tag: &Tag) -> Command {
     }
 
     cmd.args(get_global_args())
+        .arg(
+            Arg::new("info")
+                .short('i')
+                .long("info")
+                .action(clap::ArgAction::SetTrue)
+                .conflicts_with_all(["print", "silent-copy", "list"])
+                .help("Shows information about the tag"),
+        )
         .subcommands(get_default_subcommands())
         .subcommands(tag.subtags.iter().map(command_from_tag))
 }
