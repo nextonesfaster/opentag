@@ -13,7 +13,7 @@ use crate::tag::{self, Tags};
 pub(crate) const DEFAULT_SUBCOMMAND_NAMES: [&str; 3] = ["add", "remove", "update"];
 
 #[derive(Debug, Clone, Default)]
-pub(crate) struct MatchFlags {
+pub(crate) struct MatchOptions {
     pub(crate) print: bool,
     pub(crate) copy: bool,
     pub(crate) list: bool,
@@ -21,9 +21,9 @@ pub(crate) struct MatchFlags {
     pub(crate) app: Option<String>,
 }
 
-impl MatchFlags {
+impl MatchOptions {
     pub(crate) fn from_matches<const N: usize>(lom: [ArgMatches; N]) -> Self {
-        let mut flags = MatchFlags::default();
+        let mut flags = MatchOptions::default();
 
         for mut matches in lom {
             flags.list |= matches.get_flag("list");
@@ -42,8 +42,8 @@ impl MatchFlags {
 /// Runs the command for the given tag.
 ///
 /// Returns `true` if the tag is updated.
-pub(crate) fn run_tag(tag: &mut Tag, flags: MatchFlags) -> Result<()> {
-    if flags.list {
+pub(crate) fn run_tag(tag: &mut Tag, options: MatchOptions) -> Result<()> {
+    if options.list {
         // TODO: This is a terrible hack. Write own implementation.
         if !tag.subtags.is_empty() {
             let app = Command::new("list-subcommands")
@@ -67,15 +67,15 @@ pub(crate) fn run_tag(tag: &mut Tag, flags: MatchFlags) -> Result<()> {
         return Err(Error::TagWithNoPath.into());
     };
 
-    if flags.copy || flags.silent_copy {
+    if options.copy || options.silent_copy {
         let mut clipboard = Clipboard::new()?;
         clipboard.set_text(path.to_string())?;
     }
 
-    if flags.print {
+    if options.print {
         println!("{}", path);
-    } else if !flags.silent_copy {
-        if let Some(app) = flags.app.as_ref().or(tag.app.as_ref()) {
+    } else if !options.silent_copy {
+        if let Some(app) = options.app.as_ref().or(tag.app.as_ref()) {
             open::with(path, app)
         } else {
             open::that(path)

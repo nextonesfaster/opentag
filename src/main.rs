@@ -4,7 +4,7 @@ mod error;
 mod parser;
 mod tag;
 
-use commands::MatchFlags;
+use commands::MatchOptions;
 use error::{Error, Result, exit};
 use tag::Tag;
 
@@ -30,7 +30,7 @@ fn run_app() -> Result<()> {
                 tag::validate_and_write_tags(tags, &path)?;
                 println!("{action} tag.");
             } else {
-                commands::run_tag(tag, MatchFlags::from_matches([matches, ssm]))?;
+                commands::run_tag(tag, MatchOptions::from_matches([matches, ssm]))?;
             }
         } else {
             return Err(Error::NoTagFound.into());
