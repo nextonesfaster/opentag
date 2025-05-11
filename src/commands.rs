@@ -60,6 +60,13 @@ pub(crate) fn run_tag(tag: &mut Tag, options: MatchOptions) -> Result<()> {
         return Ok(());
     }
 
+    if options.info {
+        print_tag_info(tag)?;
+        if options.copy && tag.path.is_none() {
+            return Ok(());
+        }
+    }
+
     let cow;
     let path = if let Some(ref path) = tag.path {
         if path.starts_with('~') {
@@ -88,8 +95,6 @@ pub(crate) fn run_tag(tag: &mut Tag, options: MatchOptions) -> Result<()> {
             open::that(path)
         }
         .map_err(|e| format!("unable to open `{}`: {}", path, e))?;
-    } else if options.info {
-        print_tag_info(tag)?;
     }
 
     Ok(())
@@ -430,27 +435,38 @@ fn print_tag_info(tag: &Tag) -> Result<()> {
 
     color_print::cwrite!(info_str, "<g><s>{}</></>", tag.names[0])?;
 
-    if tag.names.len() > 1 {
-        color_print::cwriteln!(info_str, " [aliases: {}]", tag.names[1..].join(", "))?;
+    if let Some(path) = &tag.path {
+        color_print::cwriteln!(info_str, " - <u>{path}</>")?;
     } else {
         writeln!(info_str)?;
     }
+
+    let format_label = |label| color_print::cformat!("<y><u>{}:</></>", label);
 
     if let Some(about) = &tag.about {
         writeln!(info_str, "\n{about}")?;
     }
 
+    if tag.names.len() > 1 {
+        writeln!(
+            info_str,
+            "\n{} {}",
+            format_label("Aliases"),
+            tag.names[1..].join(", ")
+        )?;
+    }
+
     if let Some(app) = &tag.app {
-        color_print::cwriteln!(info_str, "\n<y><u>App:</></> {app}")?;
+        writeln!(info_str, "\n{} {app}", format_label("App"))?;
     }
 
     println!("{info_str}");
 
-    let subtags_label = color_print::cstr!("<y><u>Subtags:</></>");
+    let subtags_label = format_label("Subtags");
     if tag.subtags.is_empty() {
         println!("{subtags_label} none");
     } else {
-        _list_tags(tag, subtags_label)?;
+        _list_tags(tag, &subtags_label)?;
     }
 
     Ok(())
