@@ -6,7 +6,7 @@ use clap::{ArgMatches, Command};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::app::{get_args, get_default_subcommands};
+use crate::app::{get_default_subcommands, get_global_args};
 use crate::error::Result;
 use crate::{Error, commands};
 
@@ -200,7 +200,7 @@ pub(crate) fn command_from_tag(tag: &Tag) -> Command {
         cmd = cmd.visible_alias(alias);
     }
 
-    cmd.args(get_args())
+    cmd.args(get_global_args())
         .subcommands(get_default_subcommands())
         .subcommands(tag.subtags.iter().map(command_from_tag))
 }

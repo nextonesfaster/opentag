@@ -43,7 +43,7 @@ pub(crate) fn create_tags_app(tags: &Tags) -> Command {
                 .placeholder(AnsiColor::Green.on_default())
                 .valid(AnsiColor::Cyan.on_default()),
         )
-        .args(get_args())
+        .args(get_global_args())
         .group(
             ArgGroup::new("cmd-req")
                 .args(["print", "copy", "silent-copy", "app"])
@@ -53,7 +53,7 @@ pub(crate) fn create_tags_app(tags: &Tags) -> Command {
         .subcommands(tags.iter().map(command_from_tag))
 }
 
-pub(crate) fn get_args() -> [Arg; 5] {
+pub(crate) fn get_global_args() -> [Arg; 5] {
     [
         Arg::new("print")
             .short('p')
