@@ -2,6 +2,7 @@ use clap::builder::Styles;
 use clap::builder::styling::AnsiColor;
 use clap::{Arg, ArgAction, ArgGroup, Command};
 
+use crate::parser::{tag_aliases_parser, tag_name_parser};
 use crate::tag::{Tags, command_from_tag};
 
 const ABOUT: &str = "
@@ -45,79 +46,114 @@ pub fn create_tags_app(tags: &Tags) -> Command {
                 .placeholder(AnsiColor::Green.on_default())
                 .valid(AnsiColor::Cyan.on_default()),
         )
-        .arg(
-            Arg::new("print")
-                .short('p')
-                .long("print")
-                .global(true)
-                .action(ArgAction::SetTrue)
-                .help("Print the path or the URL instead of opening it."),
-        )
-        .arg(
-            Arg::new("app")
-                .short('A')
-                .long("app")
-                .num_args(1)
-                .conflicts_with_all(["print", "silent-copy"])
-                .global(true)
-                .help("Specify the app to open the path or the URL with."),
-        )
-        .arg(
-            Arg::new("copy")
-                .short('c')
-                .long("copy")
-                .global(true)
-                .action(ArgAction::SetTrue)
-                .help("Copy the path or the URL to the system's clipboard."),
-        )
-        .arg(
-            Arg::new("silent-copy")
-                .short('C')
-                .long("silent-copy")
-                .global(true)
-                .action(ArgAction::SetTrue)
-                .help(
-                    "Copy the path or the URL to the system's clipboard without opening the path.",
-                ),
-        )
-        .arg(
-            Arg::new("add")
-                .short('a')
-                .long("add")
-                .num_args(0)
-                .help("Add a new tag."),
-        )
-        .arg(
-            Arg::new("remove")
-                .short('r')
-                .long("remove")
-                .num_args(0)
-                .help("Remove an existing tag."),
-        )
-        .arg(
-            Arg::new("update")
-                .short('u')
-                .long("update")
-                .num_args(0)
-                .help("Update an existing tag."),
-        )
-        .arg(
-            Arg::new("list")
-                .short('l')
-                .long("list")
-                .global(true)
-                .action(ArgAction::SetTrue)
-                .help("List all global tags or subtags of specified tag."),
-        )
-        .groups(&[
-            ArgGroup::new("cmd-conflict")
-                .args(["add", "remove", "update", "list"])
-                .multiple(false)
-                .conflicts_with("cmd-req")
-                .required(true),
+        .args(get_args())
+        .group(
             ArgGroup::new("cmd-req")
                 .args(["print", "copy", "silent-copy", "app"])
                 .multiple(true),
-        ])
+        )
+        .subcommands(get_default_subcommands())
         .subcommands(tags.iter().map(command_from_tag))
+}
+
+pub(crate) fn get_args() -> [Arg; 5] {
+    [
+        Arg::new("print")
+            .short('p')
+            .long("print")
+            .action(ArgAction::SetTrue)
+            .help("Prints the path or the URL instead of opening it."),
+        Arg::new("app")
+            .short('A')
+            .long("app")
+            .num_args(1)
+            .value_name("APP-NAME")
+            .conflicts_with_all(["print", "silent-copy"])
+            .help("Specifies the app to open the path or the URL with."),
+        Arg::new("copy")
+            .short('c')
+            .long("copy")
+            .action(ArgAction::SetTrue)
+            .help("Copies the path or the URL to the system's clipboard."),
+        Arg::new("silent-copy")
+            .short('C')
+            .long("silent-copy")
+            .action(ArgAction::SetTrue)
+            .help("Copies the path or the URL to the system's clipboard without opening the path."),
+        Arg::new("list")
+            .short('l')
+            .long("list")
+            .conflicts_with_all(["copy", "print", "app", "silent-copy"])
+            .action(ArgAction::SetTrue)
+            .help("Lists all global tags or subtags of specified tag."),
+    ]
+}
+
+pub(crate) fn get_default_subcommands() -> [Command; 3] {
+    let common_args = [
+        Arg::new("path")
+            .visible_aliases(["link", "url"])
+            .short('p')
+            .visible_short_aliases(['l', 'u'])
+            .long("path")
+            .num_args(0..=1)
+            .value_name("PATH")
+            .help("Sets the path/URL of the tag"),
+        Arg::new("alias")
+            .short('A')
+            .long("alias")
+            .visible_alias("aliases")
+            .value_name("ALIAS(ES)")
+            .value_parser(tag_aliases_parser)
+            .num_args(0..=1)
+            .help("Sets alias(es) for the tag. Multiple aliases must be comma-separated."),
+        Arg::new("about")
+            .long("about")
+            .num_args(0..=1)
+            .value_name("TEXT")
+            .help("Sets the about text for the tag"),
+        Arg::new("app")
+            .long("app")
+            .num_args(0..=1)
+            .value_name("APP-NAME")
+            .help("Specifies the app to open the path or the URL with"),
+    ];
+
+    [
+        Command::new("add")
+            .visible_short_flag_alias('a')
+            .arg(
+                Arg::new("name")
+                    .value_parser(tag_name_parser)
+                    .value_name("TAG-NAME")
+                    .help("Sets the name of the tag"),
+            )
+            .args(common_args.clone())
+            .about("Adds a new tag")
+            .long_about("Adds a new tag. If no name is provided, the command enters interactive mode."),
+        Command::new("remove")
+            .visible_short_flag_alias('r')
+            .about("Removes an existing tag")
+            .arg(
+                Arg::new("no-prompt")
+                    .short('N')
+                    .long("no-prompt")
+                    .action(ArgAction::SetTrue)
+                    .help("Disables the confirmation prompt when removing a tag"),
+            )
+            .long_about("Removes an existing tag. If no tag is specified, the command enters interactive mode."),
+        Command::new("update")
+            .visible_short_flag_alias('u')
+            .arg(
+                Arg::new("name")
+                    .short('n')
+                    .long("name")
+                    .value_name("TAG-NAME")
+                    .value_parser(tag_name_parser)
+                    .help("Sets the name of the tag"),
+            )
+            .args(common_args)
+            .about("Updates an existing tag")
+            .long_about("Updates an existing tag. If no tag is specified, the command enters interactive mode."),
+    ]
 }

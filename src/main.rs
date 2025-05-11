@@ -4,6 +4,7 @@ mod error;
 mod parser;
 mod tag;
 
+use commands::MatchFlags;
 use error::{Result, exit};
 use tag::Tag;
 
@@ -15,50 +16,31 @@ fn run_app() -> Result<()> {
     let mut tags = tag::get_tags(&path)?;
 
     let mut app = app::create_tags_app(&tags);
-    let matches = app.get_matches_mut();
+    let mut matches = app.get_matches_mut();
 
-    if let Some((name, sub_matches)) = matches.subcommand() {
-        if matches.contains_id("cmd-conflict") && !matches.get_flag("list") {
-            return Err("this argument cannot be used with a tag".into());
-        }
-
-        if let Some((tag, sub_matches)) = tag::find_tag_and_sub_match(&mut tags, name, sub_matches)
+    if let Some((name, sub_matches)) = matches.remove_subcommand() {
+        if commands::DEFAULT_SUBCOMMAND_NAMES.contains(&name.as_str()) {
+            commands::run_global_default_command(&name, sub_matches, tags, &path)?;
+        } else if let Some((tag, ssm, opt_cmd)) =
+            tag::find_matching_tag(&mut tags, &name, sub_matches)
         {
-            let updated = commands::run_tag(tag, sub_matches)?;
-            if updated {
+            if let Some(cmd) = opt_cmd {
+                // this means we hit a nested default command
+                let action = commands::run_nested_default_command(tag, &cmd, ssm)?;
                 tag::validate_and_write_tags(tags, &path)?;
-                println!("Updated tag.")
+                println!("{action} tag.");
+            } else {
+                commands::run_tag(tag, MatchFlags::from_matches([matches, ssm]))?;
             }
         } else {
             return Err("no tag found".into());
         }
     } else if matches.get_flag("list") {
         if app.has_subcommands() {
-            app = app.help_template("TAGS\n{subcommands}");
-            for subcmd in app.get_subcommands_mut() {
-                *subcmd = subcmd.clone().hide(false);
-            }
-
-            app.print_help()?;
+            commands::list_tags(app)?;
         } else {
             println!("No tags!");
         }
-    } else {
-        let action = if matches.get_flag("add") {
-            commands::add(&mut tags)?;
-            "Added"
-        } else if matches.get_flag("remove") {
-            commands::remove(&mut tags)?;
-            "Removed"
-        } else if matches.get_flag("update") {
-            commands::update(&mut tags)?;
-            "Updated"
-        } else {
-            return Err("invalid invocation".into());
-        };
-
-        tag::validate_and_write_tags(tags, &path)?;
-        println!("\n{} tag.", action);
     }
 
     Ok(())

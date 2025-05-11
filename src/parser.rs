@@ -1,21 +1,33 @@
-#[derive(Debug, Clone)]
-pub(crate) enum TagAttribute {
-    Names(Vec<String>),
-    Path(String),
-    About(String),
-    App(String),
+use crate::commands;
+
+pub(crate) fn tag_name_parser(s: &str) -> Result<String, String> {
+    if s.is_empty() {
+        return Err("tag names cannot be empty".to_string());
+    } else if s.contains(' ') {
+        return Err("tag names cannot contain spaces".to_string());
+    } else if s.starts_with('-') {
+        return Err("tag names cannot begin with hyphens".to_string());
+    } else if commands::DEFAULT_SUBCOMMAND_NAMES.contains(&s) {
+        return Err(format!("`{s}` cannot be used as a tag name"));
+    }
+
+    Ok(s.to_string())
 }
 
-pub(crate) fn tag_attribute_parser(s: &str) -> Result<TagAttribute, &'static str> {
-    let Some((attrib, val)) = s.split_once('=') else {
-        return Err("expected valid tag attribute and value");
-    };
+pub(crate) fn tag_aliases_parser(s: &str) -> Result<Vec<String>, String> {
+    if s.contains(' ') {
+        return Err("tag aliases cannot contain spaces".to_string());
+    } else if s.starts_with('-') {
+        return Err("tag aliases cannot begin with hyphens".to_string());
+    }
 
-    Ok(match attrib {
-        "name" | "N" => TagAttribute::Names(val.split(',').map(String::from).collect()),
-        "path" | "P" => TagAttribute::Path(val.to_string()),
-        "about" => TagAttribute::About(val.to_string()),
-        "default-app" | "D" => TagAttribute::App(val.to_string()),
-        _ => return Err("invalid tag attribute"),
-    })
+    let names = s.split(',').map(String::from).collect::<Vec<_>>();
+
+    for name in &names {
+        if commands::DEFAULT_SUBCOMMAND_NAMES.contains(&name.as_str()) {
+            return Err(format!("`{name}` cannot be used as a tag name"));
+        }
+    }
+
+    Ok(names)
 }

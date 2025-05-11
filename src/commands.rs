@@ -1,36 +1,58 @@
+use std::collections::HashSet;
+use std::path::PathBuf;
+
 use arboard::Clipboard;
 use clap::{ArgMatches, Command};
 use dialoguer::theme::ColorfulTheme;
 use dialoguer::{Editor, FuzzySelect, Input};
-use itertools::Itertools;
 
 use crate::Tag;
 use crate::error::Result;
-use crate::parser::TagAttribute;
-use crate::tag::{Tags, command_from_tag};
+use crate::tag::{self, Tags};
+
+pub const DEFAULT_SUBCOMMAND_NAMES: [&str; 3] = ["add", "remove", "update"];
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct MatchFlags {
+    pub(crate) print: bool,
+    pub(crate) copy: bool,
+    pub(crate) list: bool,
+    pub(crate) silent_copy: bool,
+    pub(crate) app: Option<String>,
+}
+
+impl MatchFlags {
+    pub(crate) fn from_matches<const N: usize>(lom: [ArgMatches; N]) -> Self {
+        let mut flags = MatchFlags::default();
+
+        for mut matches in lom {
+            flags.list |= matches.get_flag("list");
+            flags.print |= matches.get_flag("print");
+            flags.copy |= matches.get_flag("copy");
+            flags.silent_copy |= matches.get_flag("silent-copy");
+            if flags.app.is_none() {
+                flags.app = matches.remove_one::<String>("app");
+            }
+        }
+
+        flags
+    }
+}
 
 /// Runs the command for the given tag.
 ///
 /// Returns `true` if the tag is updated.
-pub fn run_tag(tag: &mut Tag, matches: &ArgMatches) -> Result<bool> {
-    if matches.get_flag("list") {
+pub fn run_tag(tag: &mut Tag, flags: MatchFlags) -> Result<()> {
+    if flags.list {
         // TODO: This is a terrible hack. Write own implementation.
         if !tag.subtags.is_empty() {
-            let mut app = Command::new("list-subcommands")
-                .subcommands(tag.subtags.iter().map(command_from_tag))
-                .disable_help_subcommand(true)
-                .help_template("TAGS\n{subcommands}");
-            app.print_help()?;
+            let app = Command::new("list-subcommands")
+                .subcommands(tag.subtags.iter().map(tag::command_from_tag));
+            list_tags(app)?;
         } else {
             println!("No tags!");
         }
-        return Ok(false);
-    } else if let Some(v) = matches
-        .get_many::<TagAttribute>("tag-update")
-        .map(|v| v.cloned().collect::<Vec<_>>())
-    {
-        update_tag_inline(tag, v)?;
-        return Ok(true);
+        return Ok(());
     }
 
     let cow;
@@ -45,17 +67,15 @@ pub fn run_tag(tag: &mut Tag, matches: &ArgMatches) -> Result<bool> {
         return Err("tag has no path or url".into());
     };
 
-    let silent_copy = matches.get_flag("silent-copy");
-
-    if matches.get_flag("copy") || silent_copy {
+    if flags.copy || flags.silent_copy {
         let mut clipboard = Clipboard::new()?;
         clipboard.set_text(path.to_string())?;
     }
 
-    if matches.get_flag("print") {
+    if flags.print {
         println!("{}", path);
-    } else if !silent_copy {
-        if let Some(app) = matches.get_one::<String>("app").or(tag.app.as_ref()) {
+    } else if !flags.silent_copy {
+        if let Some(app) = flags.app.as_ref().or(tag.app.as_ref()) {
             open::with(path, app)
         } else {
             open::that(path)
@@ -63,7 +83,7 @@ pub fn run_tag(tag: &mut Tag, matches: &ArgMatches) -> Result<bool> {
         .map_err(|e| format!("unable to open `{}`: {}", path, e))?;
     }
 
-    Ok(false)
+    Ok(())
 }
 
 /// Prompts user to recursively select a tag.
@@ -116,10 +136,8 @@ pub fn add(tags: &mut Tags) -> Result<()> {
         tags
     };
 
-    for name in &names {
-        if subtags.iter().flat_map(|t| &t.names).contains(name) {
-            return Err(format!("a tag with name `{}` already exists", name).into());
-        }
+    if let Some(name) = check_if_names_are_used(&names, subtags) {
+        return Err(format!("a tag with name `{}` already exists", name).into());
     }
 
     let get_optional = |prompt| -> Result<Option<String>> {
@@ -148,29 +166,37 @@ pub fn add(tags: &mut Tags) -> Result<()> {
 }
 
 /// Runs the remove command.
-pub fn remove(tags: &mut Tags) -> Result<()> {
-    if let Some(tag) = select_tag(
+pub fn remove(tags: &mut Tags, prompt: bool) -> Result<bool> {
+    let Some(tag) = select_tag(
         tags,
         "Select the parent tag (press `esc` to quit)",
         "Select a subtag of the parent (press `esc` to select the parent)",
-    )? {
-        // we take advantage of our serialization mechanism: tags with no names
-        // are not written to the file.
-        tag.names.clear();
+    )?
+    else {
+        return Ok(false);
     };
 
-    Ok(())
+    if prompt && !remove_confirmation(&tag.names[0])? {
+        println!("\nDid not remove tag.");
+        return Ok(false);
+    }
+
+    // we take advantage of our serialization mechanism: tags with no names
+    // are not written to the file.
+    tag.names.clear();
+
+    Ok(true)
 }
 
 /// Runs the update command.
-pub fn update(tags: &mut Tags) -> Result<()> {
-    let tag = match select_tag(
+pub fn update(tags: &mut Tags) -> Result<bool> {
+    let Some(tag) = select_tag(
         tags,
         "Select the parent tag (press `esc` to quit)",
         "Select a subtag of the parent (press `esc` to select the parent)",
-    )? {
-        Some(t) => t,
-        None => return Ok(()),
+    )?
+    else {
+        return Ok(false);
     };
 
     let filter_text = |text: String| {
@@ -214,18 +240,168 @@ pub fn update(tags: &mut Tags) -> Result<()> {
 
     update_field(&mut tag.path, "Please edit/enter the path/url above.")?;
     update_field(&mut tag.about, "Please edit/enter the description above.")?;
-    update_field(&mut tag.app, "Please edit/enter the default app above.")
+    update_field(&mut tag.app, "Please edit/enter the default app above.")?;
+
+    Ok(true)
 }
 
-fn update_tag_inline(tag: &mut Tag, updates: Vec<TagAttribute>) -> Result<()> {
-    for update in updates {
-        match update {
-            TagAttribute::Names(s) => tag.names = s,
-            TagAttribute::Path(s) => tag.path = Some(s),
-            TagAttribute::About(s) => tag.about = Some(s),
-            TagAttribute::App(s) => tag.app = Some(s),
+pub(crate) fn run_global_default_command(
+    name: &str,
+    matches: ArgMatches,
+    mut tags: Tags,
+    path: &PathBuf,
+) -> Result<()> {
+    if name == "add" {
+        if let Some(tag) = tag_from_add_matches(matches) {
+            add_tag_inline(tag, &mut tags)?;
+            tag::write_tags(tags, path)?;
+        } else {
+            add(&mut tags)?;
+            tag::validate_and_write_tags(tags, path)?;
         }
+        println!("\nAdded tag.");
+    } else if name == "remove" {
+        if remove(&mut tags, !matches.get_flag("no-prompt"))? {
+            tag::write_tags(tags, path)?;
+            println!("\nRemoved tag.");
+        }
+    } else if name == "update" && update(&mut tags)? {
+        tag::validate_and_write_tags(tags, path)?;
+        println!("\nUpdated tag.");
     }
 
     Ok(())
+}
+
+pub(crate) fn tag_from_add_matches(mut matches: ArgMatches) -> Option<Tag> {
+    let name = matches.remove_one::<String>("name")?;
+    let mut names = matches
+        .remove_one::<Vec<String>>("alias")
+        .unwrap_or_default();
+    names.insert(0, name);
+
+    Some(Tag {
+        names,
+        path: matches.remove_one::<String>("path"),
+        about: matches.remove_one::<String>("about"),
+        app: matches.remove_one::<String>("app"),
+        subtags: Vec::new(),
+    })
+}
+
+pub(crate) fn add_tag_inline(tag: Tag, tags: &mut Tags) -> Result<()> {
+    if let Some(name) = check_if_names_are_used(&tag.names, tags) {
+        return Err(format!("a tag with name `{}` already exists", name).into());
+    }
+
+    tags.push(tag);
+
+    Ok(())
+}
+
+/// Checks if any name in `names` is already used.
+///
+/// Returns the first common name if any.
+fn check_if_names_are_used<'a>(names: &'a [String], subtags: &[Tag]) -> Option<&'a String> {
+    let mut used = HashSet::new();
+    for tag in subtags {
+        used.extend(&tag.names);
+    }
+    names.iter().find(|&name| used.contains(name))
+}
+
+pub(crate) fn list_tags(mut app: Command) -> Result<()> {
+    app = app
+        .help_template("TAGS\n{subcommands}")
+        .disable_help_subcommand(true);
+    for subcmd in app.get_subcommands_mut() {
+        *subcmd = subcmd
+            .clone()
+            .hide(DEFAULT_SUBCOMMAND_NAMES.contains(&subcmd.get_name())); // hide default subcommands
+    }
+
+    app.print_help()?;
+    Ok(())
+}
+
+pub(crate) fn run_nested_default_command(
+    tag: &mut Tag,
+    command: &str,
+    matches: ArgMatches,
+) -> Result<&'static str> {
+    match command {
+        "add" => {
+            let new_tag = tag_from_add_matches(matches).ok_or("tag name cannot be empty")?;
+            add_tag_inline(new_tag, &mut tag.subtags)?;
+            Ok("Added")
+        },
+        "remove" => {
+            if remove_tag_inline(tag, matches)? {
+                Ok("Removed")
+            } else {
+                Ok("Did not remove")
+            }
+        },
+        "update" => {
+            update_tag_inline(tag, matches)?;
+            Ok("Updated")
+        },
+        _ => Err(format!("unexpected command: {command}").into()),
+    }
+}
+
+fn remove_tag_inline(tag: &mut Tag, matches: ArgMatches) -> Result<bool> {
+    if !matches.get_flag("no-prompt") && !remove_confirmation(&tag.names[0])? {
+        return Ok(false);
+    }
+
+    // tags with no names are not written to the file
+    tag.names.clear();
+
+    Ok(true)
+}
+
+/// Updates a tag with new attributes in the matches.
+///
+/// This does not check if the attributes are valid or if the tag names remain unique.
+fn update_tag_inline(tag: &mut Tag, mut matches: ArgMatches) -> Result<()> {
+    if let Some(name) = matches.remove_one::<String>("name") {
+        tag.names[0] = name;
+    }
+
+    let clear_aliases = matches.contains_id("alias");
+    let aliases = matches
+        .remove_one::<Vec<String>>("alias")
+        .unwrap_or_default();
+
+    if !aliases.is_empty() {
+        tag.names.splice(1.., aliases);
+    } else if clear_aliases {
+        tag.names.truncate(1);
+    }
+
+    let mut update_if_present = |attrib, field: &mut _| {
+        let is_present = matches.contains_id(attrib);
+        if let Some(new) = matches.remove_one::<String>(attrib) {
+            *field = Some(new);
+        } else if is_present {
+            *field = None;
+        }
+    };
+
+    update_if_present("path", &mut tag.path);
+    update_if_present("about", &mut tag.about);
+    update_if_present("app", &mut tag.app);
+
+    Ok(())
+}
+
+/// Prompts the user to confirm tag removal.
+///
+/// Returns `true` if the user chooses to proceed.
+fn remove_confirmation(name: &str) -> Result<bool> {
+    dialoguer::Confirm::new()
+        .with_prompt(format!("Do you want to remove the `{}` tag?", name))
+        .interact()
+        .map_err(|e| e.into())
 }

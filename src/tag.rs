@@ -2,12 +2,13 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::{env, fs};
 
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{ArgMatches, Command};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::app::{get_args, get_default_subcommands};
+use crate::commands;
 use crate::error::Result;
-use crate::parser;
 
 /// Represents a tag.
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -104,16 +105,7 @@ pub fn create_tags_file<P: AsRef<Path>>(path: P) -> Result<()> {
 pub fn command_from_tag(tag: &Tag) -> Command {
     let mut cmd = Command::new(tag.names.first().expect("expected at least one name"))
         .disable_help_subcommand(true)
-        .subcommand_help_heading("Subtags")
-        .subcommand_value_name("SUBTAG")
-        .arg(
-            Arg::new("tag-update")
-                .short('U')
-                .long("update")
-                .value_parser(parser::tag_attribute_parser)
-                .action(ArgAction::Append)
-                .help("Edit the specified attribute for the tag."),
-        );
+        .hide(true);
 
     if let Some(long_about) = &tag.about {
         if let Some(about) = long_about.lines().next() {
@@ -126,21 +118,32 @@ pub fn command_from_tag(tag: &Tag) -> Command {
         cmd = cmd.visible_alias(alias);
     }
 
-    cmd.subcommands(tag.subtags.iter().map(command_from_tag))
+    cmd.args(get_args())
+        .subcommands(get_default_subcommands())
+        .subcommands(tag.subtags.iter().map(command_from_tag))
 }
 
 /// Find the tag matching the command invocation.
-pub fn find_tag_and_sub_match<'a, 'b>(
+///
+/// Returns the matching tag and the corresponding [`ArgMatches`] for that tag.
+///
+/// If a default subcommand is encountered, recursion stops. In that case, the
+/// returned [`ArgMatches`] corresponds to the default subcommand, not the tag itself,
+/// and the third value contains the name of the default subcommand.
+pub fn find_matching_tag<'a>(
     tags: &'a mut Tags,
     cmd: &str,
-    matches: &'b ArgMatches,
-) -> Option<(&'a mut Tag, &'b ArgMatches)> {
+    mut matches: ArgMatches,
+) -> Option<(&'a mut Tag, ArgMatches, Option<String>)> {
     for tag in tags {
         if tag.names.contains(&cmd.to_string()) {
-            if let Some((subcmd, sub_matches)) = matches.subcommand() {
-                return find_tag_and_sub_match(&mut tag.subtags, subcmd, sub_matches);
+            if let Some((subcmd, sub_matches)) = matches.remove_subcommand() {
+                if commands::DEFAULT_SUBCOMMAND_NAMES.contains(&subcmd.as_str()) {
+                    return Some((tag, sub_matches, Some(subcmd)));
+                }
+                return find_matching_tag(&mut tag.subtags, &subcmd, sub_matches);
             } else {
-                return Some((tag, matches));
+                return Some((tag, matches, None));
             }
         }
     }
