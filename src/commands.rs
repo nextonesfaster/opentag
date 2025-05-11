@@ -86,6 +86,130 @@ pub(crate) fn run_tag(tag: &mut Tag, flags: MatchFlags) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn run_global_default_command(
+    name: &str,
+    matches: ArgMatches,
+    mut tags: Tags,
+    path: &PathBuf,
+) -> Result<()> {
+    if name == "add" {
+        if let Some(tag) = tag_from_add_matches(matches) {
+            add_tag_inline(tag, &mut tags)?;
+            tag::write_tags(tags, path)?;
+        } else {
+            interactive_add(&mut tags)?;
+            tag::validate_and_write_tags(tags, path)?;
+        }
+        println!("\nAdded tag.");
+    } else if name == "remove" {
+        if interactive_remove(&mut tags, !matches.get_flag("no-prompt"))? {
+            tag::write_tags(tags, path)?;
+            println!("\nRemoved tag.");
+        }
+    } else if name == "update" && interactive_update(&mut tags)? {
+        tag::validate_and_write_tags(tags, path)?;
+        println!("\nUpdated tag.");
+    }
+
+    Ok(())
+}
+
+pub(crate) fn list_tags(mut app: Command) -> Result<()> {
+    app = app
+        .help_template("TAGS\n{subcommands}")
+        .disable_help_subcommand(true);
+    for subcmd in app.get_subcommands_mut() {
+        *subcmd = subcmd
+            .clone()
+            .hide(DEFAULT_SUBCOMMAND_NAMES.contains(&subcmd.get_name())); // hide default subcommands
+    }
+
+    app.print_help()?;
+    Ok(())
+}
+
+pub(crate) fn run_nested_default_command(
+    tag: &mut Tag,
+    command: &str,
+    matches: ArgMatches,
+) -> Result<&'static str> {
+    match command {
+        "add" => {
+            let new_tag = tag_from_add_matches(matches).ok_or("tag name cannot be empty")?;
+            add_tag_inline(new_tag, &mut tag.subtags)?;
+            Ok("Added")
+        },
+        "remove" => {
+            if remove_tag_inline(tag, matches)? {
+                Ok("Removed")
+            } else {
+                Ok("Did not remove")
+            }
+        },
+        "update" => {
+            update_tag_inline(tag, matches)?;
+            Ok("Updated")
+        },
+        _ => Err(format!("unexpected command: {command}").into()),
+    }
+}
+
+pub fn add_tag_inline(tag: Tag, tags: &mut Tags) -> Result<()> {
+    if let Some(name) = check_if_names_are_used(&tag.names, tags) {
+        return Err(format!("a tag with name `{}` already exists", name).into());
+    }
+
+    tags.push(tag);
+
+    Ok(())
+}
+
+fn remove_tag_inline(tag: &mut Tag, matches: ArgMatches) -> Result<bool> {
+    if !matches.get_flag("no-prompt") && !remove_confirmation(&tag.names[0])? {
+        return Ok(false);
+    }
+
+    // tags with no names are not written to the file
+    tag.names.clear();
+
+    Ok(true)
+}
+
+/// Updates a tag with new attributes in the matches.
+///
+/// This does not check if the attributes are valid or if the tag names remain unique.
+fn update_tag_inline(tag: &mut Tag, mut matches: ArgMatches) -> Result<()> {
+    if let Some(name) = matches.remove_one::<String>("name") {
+        tag.names[0] = name;
+    }
+
+    let clear_aliases = matches.contains_id("alias");
+    let aliases = matches
+        .remove_one::<Vec<String>>("alias")
+        .unwrap_or_default();
+
+    if !aliases.is_empty() {
+        tag.names.splice(1.., aliases);
+    } else if clear_aliases {
+        tag.names.truncate(1);
+    }
+
+    let mut update_if_present = |attrib, field: &mut _| {
+        let is_present = matches.contains_id(attrib);
+        if let Some(new) = matches.remove_one::<String>(attrib) {
+            *field = Some(new);
+        } else if is_present {
+            *field = None;
+        }
+    };
+
+    update_if_present("path", &mut tag.path);
+    update_if_present("about", &mut tag.about);
+    update_if_present("app", &mut tag.app);
+
+    Ok(())
+}
+
 /// Prompts user to recursively select a tag.
 fn select_tag<'a>(
     tags: &'a mut Tags,
@@ -118,7 +242,7 @@ fn select_tag<'a>(
 }
 
 /// Runs the add command.
-pub(crate) fn interactive_add(tags: &mut Tags) -> Result<()> {
+fn interactive_add(tags: &mut Tags) -> Result<()> {
     let names: Vec<_> = Input::<String>::new()
         .with_prompt("Enter tag name and aliases (comma-separated; at least one)")
         .interact_text()?
@@ -166,7 +290,7 @@ pub(crate) fn interactive_add(tags: &mut Tags) -> Result<()> {
 }
 
 /// Runs the remove command.
-pub(crate) fn interactive_remove(tags: &mut Tags, prompt: bool) -> Result<bool> {
+fn interactive_remove(tags: &mut Tags, prompt: bool) -> Result<bool> {
     let Some(tag) = select_tag(
         tags,
         "Select the parent tag (press `esc` to quit)",
@@ -189,7 +313,7 @@ pub(crate) fn interactive_remove(tags: &mut Tags, prompt: bool) -> Result<bool> 
 }
 
 /// Runs the update command.
-pub(crate) fn interactive_update(tags: &mut Tags) -> Result<bool> {
+fn interactive_update(tags: &mut Tags) -> Result<bool> {
     let Some(tag) = select_tag(
         tags,
         "Select the parent tag (press `esc` to quit)",
@@ -245,35 +369,7 @@ pub(crate) fn interactive_update(tags: &mut Tags) -> Result<bool> {
     Ok(true)
 }
 
-pub(crate) fn run_global_default_command(
-    name: &str,
-    matches: ArgMatches,
-    mut tags: Tags,
-    path: &PathBuf,
-) -> Result<()> {
-    if name == "add" {
-        if let Some(tag) = tag_from_add_matches(matches) {
-            add_tag_inline(tag, &mut tags)?;
-            tag::write_tags(tags, path)?;
-        } else {
-            interactive_add(&mut tags)?;
-            tag::validate_and_write_tags(tags, path)?;
-        }
-        println!("\nAdded tag.");
-    } else if name == "remove" {
-        if interactive_remove(&mut tags, !matches.get_flag("no-prompt"))? {
-            tag::write_tags(tags, path)?;
-            println!("\nRemoved tag.");
-        }
-    } else if name == "update" && interactive_update(&mut tags)? {
-        tag::validate_and_write_tags(tags, path)?;
-        println!("\nUpdated tag.");
-    }
-
-    Ok(())
-}
-
-pub(crate) fn tag_from_add_matches(mut matches: ArgMatches) -> Option<Tag> {
+fn tag_from_add_matches(mut matches: ArgMatches) -> Option<Tag> {
     let name = matches.remove_one::<String>("name")?;
     let mut names = matches
         .remove_one::<Vec<String>>("alias")
@@ -289,14 +385,14 @@ pub(crate) fn tag_from_add_matches(mut matches: ArgMatches) -> Option<Tag> {
     })
 }
 
-pub(crate) fn add_tag_inline(tag: Tag, tags: &mut Tags) -> Result<()> {
-    if let Some(name) = check_if_names_are_used(&tag.names, tags) {
-        return Err(format!("a tag with name `{}` already exists", name).into());
-    }
-
-    tags.push(tag);
-
-    Ok(())
+/// Prompts the user to confirm tag removal.
+///
+/// Returns `true` if the user chooses to proceed.
+fn remove_confirmation(name: &str) -> Result<bool> {
+    dialoguer::Confirm::new()
+        .with_prompt(format!("Do you want to remove the `{}` tag?", name))
+        .interact()
+        .map_err(|e| e.into())
 }
 
 /// Checks if any name in `names` is already used.
@@ -308,100 +404,4 @@ fn check_if_names_are_used<'a>(names: &'a [String], subtags: &[Tag]) -> Option<&
         used.extend(&tag.names);
     }
     names.iter().find(|&name| used.contains(name))
-}
-
-pub(crate) fn list_tags(mut app: Command) -> Result<()> {
-    app = app
-        .help_template("TAGS\n{subcommands}")
-        .disable_help_subcommand(true);
-    for subcmd in app.get_subcommands_mut() {
-        *subcmd = subcmd
-            .clone()
-            .hide(DEFAULT_SUBCOMMAND_NAMES.contains(&subcmd.get_name())); // hide default subcommands
-    }
-
-    app.print_help()?;
-    Ok(())
-}
-
-pub(crate) fn run_nested_default_command(
-    tag: &mut Tag,
-    command: &str,
-    matches: ArgMatches,
-) -> Result<&'static str> {
-    match command {
-        "add" => {
-            let new_tag = tag_from_add_matches(matches).ok_or("tag name cannot be empty")?;
-            add_tag_inline(new_tag, &mut tag.subtags)?;
-            Ok("Added")
-        },
-        "remove" => {
-            if remove_tag_inline(tag, matches)? {
-                Ok("Removed")
-            } else {
-                Ok("Did not remove")
-            }
-        },
-        "update" => {
-            update_tag_inline(tag, matches)?;
-            Ok("Updated")
-        },
-        _ => Err(format!("unexpected command: {command}").into()),
-    }
-}
-
-fn remove_tag_inline(tag: &mut Tag, matches: ArgMatches) -> Result<bool> {
-    if !matches.get_flag("no-prompt") && !remove_confirmation(&tag.names[0])? {
-        return Ok(false);
-    }
-
-    // tags with no names are not written to the file
-    tag.names.clear();
-
-    Ok(true)
-}
-
-/// Updates a tag with new attributes in the matches.
-///
-/// This does not check if the attributes are valid or if the tag names remain unique.
-fn update_tag_inline(tag: &mut Tag, mut matches: ArgMatches) -> Result<()> {
-    if let Some(name) = matches.remove_one::<String>("name") {
-        tag.names[0] = name;
-    }
-
-    let clear_aliases = matches.contains_id("alias");
-    let aliases = matches
-        .remove_one::<Vec<String>>("alias")
-        .unwrap_or_default();
-
-    if !aliases.is_empty() {
-        tag.names.splice(1.., aliases);
-    } else if clear_aliases {
-        tag.names.truncate(1);
-    }
-
-    let mut update_if_present = |attrib, field: &mut _| {
-        let is_present = matches.contains_id(attrib);
-        if let Some(new) = matches.remove_one::<String>(attrib) {
-            *field = Some(new);
-        } else if is_present {
-            *field = None;
-        }
-    };
-
-    update_if_present("path", &mut tag.path);
-    update_if_present("about", &mut tag.about);
-    update_if_present("app", &mut tag.app);
-
-    Ok(())
-}
-
-/// Prompts the user to confirm tag removal.
-///
-/// Returns `true` if the user chooses to proceed.
-fn remove_confirmation(name: &str) -> Result<bool> {
-    dialoguer::Confirm::new()
-        .with_prompt(format!("Do you want to remove the `{}` tag?", name))
-        .interact()
-        .map_err(|e| e.into())
 }

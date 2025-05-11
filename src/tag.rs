@@ -75,6 +75,50 @@ pub(crate) fn get_tags<P: AsRef<Path>>(path: P) -> Result<Tags> {
         .map_err(|e| format!("json error at path `{}`: {}", path.display(), e).into())
 }
 
+/// Deserializes a string or a list of strings into a `Vec<String>`.
+///
+/// Returns an error if an empty list is provided.
+fn deserialize_one_or_more<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
+where
+    D: Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper<T> {
+        One(T),
+        Many(Vec<T>),
+    }
+
+    Ok(match Helper::deserialize(deserializer)? {
+        Helper::One(s) => vec![s],
+        Helper::Many(v) => {
+            if v.is_empty() {
+                return Err(serde::de::Error::custom(
+                    "expected at least one item, found empty array",
+                ));
+            } else {
+                v
+            }
+        },
+    })
+}
+
+/// Skips serializing tags with no names.
+fn skip_no_names<S>(tags: &[Tag], serializer: S) -> std::result::Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let len = tags.iter().filter(|t| !t.names.is_empty()).count();
+    let mut seq = serializer.serialize_seq(Some(len))?;
+    for tag in tags {
+        if !tag.names.is_empty() {
+            seq.serialize_element(tag)?;
+        }
+    }
+    seq.end()
+}
+
 /// Writes the tags at the given path, creating the file if it does not exist.
 pub(crate) fn write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
     Ok(fs::write(
@@ -99,6 +143,40 @@ pub(crate) fn create_tags_file<P: AsRef<Path>>(path: P) -> Result<()> {
     fs::write(path, "[]")?;
 
     Ok(())
+}
+
+/// Checks if any two tags have a common name at the same level of tag hierarchy.
+pub(crate) fn validate_tags(tags: &Tags) -> Option<&str> {
+    fn recurse(tags: &Tags) -> Option<&str> {
+        let mut seen = HashSet::new();
+        for tag in tags {
+            for name in &tag.names {
+                if !seen.insert(name.as_str()) {
+                    return Some(name);
+                }
+            }
+        }
+
+        for tag in tags {
+            if let Some(dupe) = recurse(&tag.subtags) {
+                return Some(dupe);
+            }
+        }
+
+        None
+    }
+
+    recurse(tags)
+}
+
+/// Writes the tags at the given path if they are valid.
+///
+/// Creates the file at path if it does not exist.
+pub(crate) fn validate_and_write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
+    if let Some(common) = validate_tags(&tags) {
+        return Err(format!("a tag with name `{common}` already exists").into());
+    }
+    write_tags(tags, path)
 }
 
 /// Creates a `clap` subcommand for the given tag.
@@ -149,82 +227,4 @@ pub(crate) fn find_matching_tag<'a>(
     }
 
     None
-}
-
-/// Deserializes a string or a list of strings into a `Vec<String>`.
-///
-/// Returns an error if an empty list is provided.
-fn deserialize_one_or_more<'de, D, T>(deserializer: D) -> std::result::Result<Vec<T>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    #[derive(Deserialize)]
-    #[serde(untagged)]
-    enum Helper<T> {
-        One(T),
-        Many(Vec<T>),
-    }
-
-    Ok(match Helper::deserialize(deserializer)? {
-        Helper::One(s) => vec![s],
-        Helper::Many(v) => {
-            if v.is_empty() {
-                return Err(serde::de::Error::custom(
-                    "expected at least one item, found empty array",
-                ));
-            } else {
-                v
-            }
-        },
-    })
-}
-
-/// Skips serializing tags with no names.
-fn skip_no_names<S>(tags: &[Tag], serializer: S) -> std::result::Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let len = tags.iter().filter(|t| !t.names.is_empty()).count();
-    let mut seq = serializer.serialize_seq(Some(len))?;
-    for tag in tags {
-        if !tag.names.is_empty() {
-            seq.serialize_element(tag)?;
-        }
-    }
-    seq.end()
-}
-
-/// Checks if any two tags have a common name at the same level of tag hierarchy.
-pub(crate) fn validate_tags(tags: &Tags) -> Option<&str> {
-    fn recurse(tags: &Tags) -> Option<&str> {
-        let mut seen = HashSet::new();
-        for tag in tags {
-            for name in &tag.names {
-                if !seen.insert(name.as_str()) {
-                    return Some(name);
-                }
-            }
-        }
-
-        for tag in tags {
-            if let Some(dupe) = recurse(&tag.subtags) {
-                return Some(dupe);
-            }
-        }
-
-        None
-    }
-
-    recurse(tags)
-}
-
-/// Writes the tags at the given path if they are valid.
-///
-/// Creates the file at path if it does not exist.
-pub(crate) fn validate_and_write_tags<P: AsRef<Path>>(tags: Tags, path: P) -> Result<()> {
-    if let Some(common) = validate_tags(&tags) {
-        return Err(format!("a tag with name `{common}` already exists").into());
-    }
-    write_tags(tags, path)
 }
