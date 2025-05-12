@@ -2,3 +2,4 @@
 /.tags.json
 .conv.py
 .DS_Store
+/.vscode
