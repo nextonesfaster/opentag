@@ -72,12 +72,12 @@ pub(crate) fn get_global_args() -> [Arg; 5] {
             .short('c')
             .long("copy")
             .action(ArgAction::SetTrue)
-            .help("Copy the path or the URL to the system's clipboard"),
+            .help("Copy the path or the URL to the system clipboard"),
         Arg::new("silent-copy")
             .short('C')
             .long("silent-copy")
             .action(ArgAction::SetTrue)
-            .help("Copy the path or the URL to the system's clipboard without opening the path"),
+            .help("Copy the path or the URL to the system clipboard without opening it"),
         Arg::new("list")
             .short('l')
             .long("list")

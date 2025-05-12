@@ -65,7 +65,7 @@ Run `ot -h` to see a brief overview (shown below), or `ot --help` for the full h
 opentag 1.0.0
 Sujal Bolia <sujalbolia@gmail.com>
 
-opentag (ot) opens a tagged path or URL using the configured system program.
+opentag (ot) opens tagged files or URLs using the default system application.
 
 Usage: ot [OPTIONS] [COMMAND-OR-TAG]
 
@@ -77,8 +77,8 @@ Commands:
 Options:
   -p, --print           Print the path or the URL instead of opening it
   -A, --app <APP-NAME>  Specify the app to open the path or the URL with
-  -c, --copy            Copy the path or the URL to the system's clipboard
-  -C, --silent-copy     Copy the path or the URL to the system's clipboard without opening the path
+  -c, --copy            Copy the path or the URL to the system clipboard
+  -C, --silent-copy     Copy the path or the URL to the system clipboard without opening it
   -l, --list            List all global tags or subtags of specified tag
   -h, --help            Print help (see more with '--help')
   -V, --version         Print version
