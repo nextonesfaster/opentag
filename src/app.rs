@@ -21,19 +21,18 @@ const HELP_TEMPLATE: &str = color_print::cstr!(
     r#"{before-help}<g><s>{bin}</></> {version}
 {author-with-newline}
 {about-with-newline}
-{usage-heading} {usage}
+{usage-heading} <g>{bin-name} [OPTIONS] [COMMAND-OR-TAG]</>
 
 {all-args}{after-help}"#
 );
 
 pub(crate) fn create_tags_app(tags: &Tags) -> Command {
-    clap::command!()
+    let app = clap::command!()
         .arg_required_else_help(true)
         .subcommand_negates_reqs(true)
         .disable_help_subcommand(true)
         .about(ABOUT.trim_start().lines().next())
         .long_about(ABOUT)
-        .help_template(HELP_TEMPLATE)
         .hide_possible_values(true)
         .styles(
             Styles::styled()
@@ -50,7 +49,9 @@ pub(crate) fn create_tags_app(tags: &Tags) -> Command {
                 .multiple(true),
         )
         .subcommands(get_default_subcommands())
-        .subcommands(tags.iter().map(command_from_tag))
+        .subcommands(tags.iter().map(command_from_tag));
+
+    app.help_template(get_help_template())
 }
 
 pub(crate) fn get_global_args() -> [Arg; 5] {
@@ -154,4 +155,8 @@ pub(crate) fn get_default_subcommands() -> [Command; 3] {
             .about("Update an existing tag")
             .long_about("Update an existing tag. If no tag is specified, the command enters interactive mode."),
     ]
+}
+
+fn get_help_template() -> String {
+    HELP_TEMPLATE.replace("{bin-name}", option_env!("CARGO_BIN_NAME").unwrap_or("ot"))
 }

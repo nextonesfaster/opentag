@@ -57,8 +57,7 @@ Sujal Bolia <sujalbolia@gmail.com>
 
 opentag (ot) opens a tagged path or URL using the configured system program.
 
-Usage: ot [OPTIONS]
-       ot [OPTIONS] <COMMAND>
+Usage: ot [OPTIONS] [COMMAND-OR-TAG]
 
 Commands:
   add     Add a new tag [aliases: -a]
