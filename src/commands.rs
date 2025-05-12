@@ -62,7 +62,7 @@ pub(crate) fn run_tag(tag: &mut Tag, options: MatchOptions) -> Result<()> {
 
     if options.info {
         print_tag_info(tag)?;
-        if options.copy && tag.path.is_none() {
+        if !options.copy || tag.path.is_none() {
             return Ok(());
         }
     }
