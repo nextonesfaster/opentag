@@ -5,14 +5,14 @@ use clap::{Arg, ArgAction, ArgGroup, Command};
 use crate::parser::{tag_aliases_parser, tag_name_parser};
 use crate::tag::{Tags, command_from_tag};
 
-const ABOUT: &str = "
-opentag (ot) opens a tagged path or URL using the configured system program.
+const ABOUT: &str = "opentag (ot) opens tagged files or URLs using the default system application.
 
-Tags are defined in a `json` data file. See the project home page for
-information about the structure and the location of this file.
+It provides a convenient way to manage frequently accessed resources—such as
+websites, documents, or directories—without relying on browser bookmarks or manual
+path entry. Resources are organized using user-defined tags, which can be nested
+hierarchically via subtags. Each tag may also include a description for reference.
 
-The tags are added to the application as \"subcommands\" at run-time and appear
-in the help text.
+For setup usage examples and data format, refer to the project repository.
 
 Project home page: https://github.com/nextonesfaster/opentag
 ";

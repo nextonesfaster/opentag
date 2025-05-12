@@ -1,8 +1,18 @@
 # opentag (ot)
 
-`opentag` (binary name: `ot`) is a command-line tool that opens a tagged path or URL using the configured system program.
+`opentag` (binary: `ot`) is a command-line utility for opening tagged files or URLs using the system’s default applications.
 
-`opentag` is useful when you have a bunch of websites and files you regularly open. Instead of adding bookmarks to different browsers and navigating through your file system or typing the file paths and URLs by hand each time, you can simply add them as tags and instantly open them with a short command. Tags can be grouped as subtags, which can have even more subtags! You can also provide helpful descriptions for each tag.
+It provides a convenient way to manage frequently accessed resources—such as websites, documents, or directories—without relying on browser bookmarks or manual path entry. Resources are organized using user-defined tags, which can be nested hierarchically via subtags. Each tag may also include a description for reference.
+
+All tags are configured through a structured JSON file. For setup instructions and usage examples, see the following sections.
+
+- [Usage](#usage)
+- [Defining Tags](#defining-tags)
+  - [Structure](#structure)
+  - [Location](#location)
+- [Installation](#installation)
+- [License](#license)
+  - [Contribution](#contribution)
 
 ## Usage
 
